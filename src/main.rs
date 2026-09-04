@@ -13,8 +13,9 @@ fn main() {
     rl.set_target_fps(60);
 
     // La camara existe en el mundo 3D, por eso usa vectores (x, y, z).
+    let camera_position = Vector3::new(4.5, 3.2, 6.0);
     let camera = Camera3D::perspective(
-        Vector3::new(4.5, 3.2, 6.0), // Posicion de la camara
+        camera_position,             // Posicion de la camara
         Vector3::new(0.0, 1.0, 0.0), // Punto hacia el que observa
         Vector3::new(0.0, 1.0, 0.0), // Direccion hacia arriba
         45.0,                        // Campo de vision
@@ -34,10 +35,19 @@ fn main() {
     let light_position_location = lighting_shader.get_shader_location("lightPosition");
     let light_color_location = lighting_shader.get_shader_location("lightColor");
     let ambient_color_location = lighting_shader.get_shader_location("ambientColor");
+    let view_position_location = lighting_shader.get_shader_location("viewPosition");
+    let shininess_location = lighting_shader.get_shader_location("shininess");
+    let specular_strength_location = lighting_shader.get_shader_location("specularStrength");
 
     lighting_shader.set_shader_value(light_position_location, light_position);
     lighting_shader.set_shader_value(light_color_location, Vector3::new(1.0, 1.0, 1.0));
     lighting_shader.set_shader_value(ambient_color_location, Vector3::new(0.08, 0.08, 0.10));
+    lighting_shader.set_shader_value(view_position_location, camera_position);
+
+    // Valores iniciales para una superficie lisa y brillante.
+    let mut shininess = 64.0_f32;
+    let mut specular_strength = 0.85_f32;
+    let mut material_name = "LISO / PULIDO";
 
     let mesh = Mesh::gen_mesh_sphere(&thread, 1.0, 32, 32);
 
@@ -60,6 +70,23 @@ fn main() {
     let sphere_position = Vector3::new(0.0, 1.0, 0.0);
 
     while !rl.window_should_close() {
+        // Una superficie rugosa tiene un brillo mas amplio y menos intenso.
+        if rl.is_key_pressed(KeyboardKey::KEY_ONE) {
+            shininess = 8.0;
+            specular_strength = 0.25;
+            material_name = "RUGOSO / MATE";
+        }
+
+        // Una superficie lisa concentra un reflejo blanco pequeno e intenso.
+        if rl.is_key_pressed(KeyboardKey::KEY_TWO) {
+            shininess = 64.0;
+            specular_strength = 0.85;
+            material_name = "LISO / PULIDO";
+        }
+
+        lighting_shader.set_shader_value(shininess_location, shininess);
+        lighting_shader.set_shader_value(specular_strength_location, specular_strength);
+
         let mut drawing = rl.begin_drawing(&thread);
         drawing.clear_background(Color::new(8, 12, 22, 255));
 
@@ -83,9 +110,23 @@ fn main() {
 
         drawing.draw_text("MATERIAL CON ILUMINACION", 20, 20, 22, Color::RAYWHITE);
         drawing.draw_text(
-            "La esfera amarilla indica la posicion de la luz",
+            "1: rugoso/mate  |  2: liso/pulido",
             20,
             52,
+            18,
+            Color::LIGHTGRAY,
+        );
+        drawing.draw_text(
+            &format!("Material actual: {material_name}"),
+            20,
+            78,
+            18,
+            Color::ORANGE,
+        );
+        drawing.draw_text(
+            "La esfera amarilla indica la posicion de la luz",
+            20,
+            104,
             18,
             Color::LIGHTGRAY,
         );
