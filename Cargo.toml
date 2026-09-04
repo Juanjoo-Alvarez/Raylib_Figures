@@ -1,0 +1,8 @@
+[package]
+name = "esfera_framebuffer"
+version = "0.1.0"
+edition = "2021"
+authors = ["Juan Jose Rivas Alvarez <carnet 24856>"]
+
+[dependencies]
+raylib = { version = "6.0.0", features = ["SUPPORT_IMAGE_GENERATION"] }
