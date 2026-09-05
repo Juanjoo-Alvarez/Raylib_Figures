@@ -11,6 +11,9 @@ uniform vec4 colDiffuse;
 uniform vec3 lightPosition;
 uniform vec3 lightColor;
 uniform vec3 ambientColor;
+uniform vec3 viewPosition;
+uniform float shininess;
+uniform float specularStrength;
 
 out vec4 finalColor;
 
@@ -22,7 +25,21 @@ void main()
     vec3 directionToLight = normalize(lightPosition - fragPosition);
     float diffuse = max(dot(normal, directionToLight), 0.0);
 
-    // Solo se combinan luz ambiental y luz difusa de Lambert.
-    vec3 illumination = ambientColor + lightColor * diffuse;
-    finalColor = vec4(textureColor.rgb * illumination, textureColor.a);
+    // Reflejo especular Blinn-Phong: depende de la luz, la normal y la camara.
+    vec3 directionToView = normalize(viewPosition - fragPosition);
+    vec3 halfDirection = normalize(directionToLight + directionToView);
+    float specular = 0.0;
+
+    if (diffuse > 0.0)
+    {
+        specular = pow(max(dot(normal, halfDirection), 0.0), shininess);
+    }
+
+    vec3 diffuseAndAmbient = textureColor.rgb *
+                             (ambientColor + lightColor * diffuse);
+    // El reflejo se agrega en blanco, como el destello sobre pintura pulida.
+    vec3 specularLight = vec3(1.0) * specular * specularStrength;
+
+    finalColor = vec4(min(diffuseAndAmbient + specularLight, vec3(1.0)),
+                      textureColor.a);
 }

@@ -21,8 +21,11 @@ fn main() {
         45.0,                        // Campo de vision
     );
 
-    // La luz permanece fija arriba y a un lado para que el sombreado se note.
-    let light_position = Vector3::new(-2.0, 5.0, 2.0);
+    // La luz gira alrededor del cubo, pero siempre permanece arriba.
+    let mut light_position = Vector3::new(3.0, 5.0, 0.0);
+    let mut light_angle = 0.0_f32;
+    let mut rotation_angle = 0.0_f32;
+    let mut animate_light = true;
 
     // El shader calcula la iluminacion de la textura usando las normales.
     // Se declara antes del modelo para que viva mientras el modelo lo utiliza.
@@ -35,10 +38,19 @@ fn main() {
     let light_position_location = lighting_shader.get_shader_location("lightPosition");
     let light_color_location = lighting_shader.get_shader_location("lightColor");
     let ambient_color_location = lighting_shader.get_shader_location("ambientColor");
+    let view_position_location = lighting_shader.get_shader_location("viewPosition");
+    let shininess_location = lighting_shader.get_shader_location("shininess");
+    let specular_strength_location = lighting_shader.get_shader_location("specularStrength");
 
     lighting_shader.set_shader_value(light_position_location, light_position);
-    lighting_shader.set_shader_value(light_color_location, Vector3::new(1.0, 1.0, 1.0));
-    lighting_shader.set_shader_value(ambient_color_location, Vector3::new(0.08, 0.08, 0.10));
+    lighting_shader.set_shader_value(light_color_location, Vector3::new(1.15, 1.05, 0.95));
+    lighting_shader.set_shader_value(ambient_color_location, Vector3::new(0.04, 0.05, 0.08));
+    lighting_shader.set_shader_value(view_position_location, camera_position);
+
+    // El cubo comienza con una apariencia lisa y brillante.
+    let mut shininess = 24.0_f32;
+    let mut specular_strength = 2.2_f32;
+    let mut material_name = "LISO / PULIDO";
 
     // Creamos un cubo de dos unidades por lado.
     let mesh = Mesh::gen_mesh_cube(&thread, 2.0, 2.0, 2.0);
@@ -51,7 +63,7 @@ fn main() {
         .expect("No se pudo cargar el modelo del cubo");
 
     // El color plano permite distinguir la intensidad difusa de cada cara.
-    cube_model.materials_mut()[0].set_map_color(MATERIAL_MAP_ALBEDO, Color::new(45, 125, 235, 255));
+    cube_model.materials_mut()[0].set_map_color(MATERIAL_MAP_ALBEDO, Color::new(25, 80, 190, 255));
 
     cube_model.materials_mut()[0].set_shader(&lighting_shader);
 
@@ -59,6 +71,40 @@ fn main() {
     let cube_position = Vector3::new(0.0, 1.0, 0.0);
 
     while !rl.window_should_close() {
+        let delta_time = rl.get_frame_time();
+
+        // ESPACIO permite congelar la luz para estudiar el resultado.
+        if rl.is_key_pressed(KeyboardKey::KEY_SPACE) {
+            animate_light = !animate_light;
+        }
+
+        if animate_light {
+            light_angle += delta_time * 0.8;
+            light_position.x = light_angle.cos() * 3.5;
+            light_position.z = light_angle.sin() * 3.5;
+        }
+
+        // La rotacion lenta hace que el reflejo recorra las distintas caras.
+        rotation_angle += delta_time * 18.0;
+
+        // Un brillo amplio y debil simula una superficie mas rugosa.
+        if rl.is_key_pressed(KeyboardKey::KEY_ONE) {
+            shininess = 4.0;
+            specular_strength = 0.18;
+            material_name = "RUGOSO / MATE";
+        }
+
+        // Un brillo concentrado e intenso simula una superficie lisa.
+        if rl.is_key_pressed(KeyboardKey::KEY_TWO) {
+            shininess = 24.0;
+            specular_strength = 2.2;
+            material_name = "LISO / PULIDO";
+        }
+
+        lighting_shader.set_shader_value(light_position_location, light_position);
+        lighting_shader.set_shader_value(shininess_location, shininess);
+        lighting_shader.set_shader_value(specular_strength_location, specular_strength);
+
         let mut drawing = rl.begin_drawing(&thread);
         drawing.clear_background(Color::new(8, 12, 22, 255));
 
@@ -66,7 +112,14 @@ fn main() {
             // Las figuras de este bloque se proyectan usando la camara 3D.
             let mut mode_3d = drawing.begin_mode3D(camera);
 
-            mode_3d.draw_model(&mut cube_model, cube_position, 1.0, Color::WHITE);
+            mode_3d.draw_model_ex(
+                &mut cube_model,
+                cube_position,
+                Vector3::new(0.0, 1.0, 0.0),
+                rotation_angle,
+                Vector3::new(1.0, 1.0, 1.0),
+                Color::WHITE,
+            );
 
             // Este cubo pequeno muestra la posicion de la luz.
             mode_3d.draw_cube(light_position, 0.25, 0.25, 0.25, Color::YELLOW);
@@ -80,13 +133,26 @@ fn main() {
             mode_3d.draw_grid(12, 1.0);
         }
 
-        drawing.draw_text("CUBO CON LUZ DIFUSA", 20, 20, 22, Color::RAYWHITE);
         drawing.draw_text(
-            "Cada cara recibe luz segun su orientacion",
+            "CUBO CON LUZ DIFUSA Y ESPECULAR",
+            20,
+            20,
+            22,
+            Color::RAYWHITE,
+        );
+        drawing.draw_text(
+            "1: rugoso/mate  |  2: liso/pulido  |  ESPACIO: pausar luz",
             20,
             52,
             18,
             Color::LIGHTGRAY,
+        );
+        drawing.draw_text(
+            &format!("Material actual: {material_name}"),
+            20,
+            78,
+            18,
+            Color::ORANGE,
         );
         drawing.draw_text("ESC: salir", 20, HEIGHT - 35, 18, Color::LIGHTGRAY);
         drawing.draw_fps(WIDTH - 95, 10);
